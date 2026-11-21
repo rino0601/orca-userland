@@ -15,17 +15,22 @@ pwd
 
 ## 2. 필요한 패키지 설치
 
+UserLAnd 기본 이미지에는 C 링커(`cc`)가 없다. 그대로 두면 pyo3/maturin으로 Rust 확장을 빌드할 때 `error: linker 'cc' not found`로 실패한다. `build-essential`이 `gcc`/`cc`/`ld`/`ar`을 제공하므로 함께 설치한다.
+
 ```sh
 sudo apt update
-sudo apt install -y curl ca-certificates git util-linux
+sudo apt install -y curl ca-certificates git util-linux build-essential
 ```
 
 ```sh
 curl --version | head -1
 flock --version
+cc --version | head -1
 ```
 
-→ curl 버전과 `flock (util-linux) ...` 출력
+→ curl 버전, `flock (util-linux) ...`, `cc (Ubuntu ...) ...` 출력
+
+`apt`는 터미널에서 쓰는 권장 명령이다. `apt-get`은 예전 저수준 명령으로 스크립트에서 여전히 쓰인다.
 
 ## 3. mise 설치
 
