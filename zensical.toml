@@ -1,0 +1,5 @@
+[project]
+site_name = "Orca Userland"
+site_description = "mise + uv + zensical 개발 환경"
+
+nav = [{ "Home" = "index.md" }]
