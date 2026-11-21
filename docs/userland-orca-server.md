@@ -166,7 +166,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6768/
 
 ### 페어링 링크 얻기
 
-10단계의 `.bashrc` 블록을 넣으면 새 대화형 세션을 열 때 서버 자동 실행 직후 QR 코드와 링크가 그 터미널에 출력된다. 비대화형 셸에서는 출력되지 않는다.
+10단계의 `.bashrc` 블록을 넣으면 새 대화형 세션을 열 때 서버 자동 실행 직후 `orca://` 링크 한 줄이 그 터미널에 출력된다. 비대화형 셸에서는 출력되지 않는다.
 
 서버를 재시작하지 않고 다시 받으려면 다음을 실행한다.
 
@@ -182,7 +182,7 @@ orca pair --mobile --address 127.0.0.1 --rotate
 
 어떻게 확인하는가
 
-→ `The client will connect to ws://127.0.0.1:6768.`와 QR 코드, `orca://` 링크가 출력된다.
+→ `The client will connect to ws://127.0.0.1:6768.`와 `orca://` 링크 한 줄이 출력된다. QR 아스키가 필요하면 `orca pair --mobile`을 직접 실행한다.
 
 첫 번째 터미널에서 `Ctrl-C`로 서버를 멈춘다.
 
@@ -276,7 +276,7 @@ ls -l ~/.config/orca/autostart-orca-serve.sh ~/.config/orca/logs/orca-autostart.
 cat >> ~/.bashrc <<'EOF'
 # >>> orca-server-autostart (UserLAnd) >>>
 # Starts the local Orca runtime server once when an interactive Bash opens,
-# then prints a fresh mobile pairing link (QR + orca:// URL) in this terminal.
+# then prints only the orca:// pairing link in this terminal.
 # Idempotent: an already-running server is left untouched. Disable by removing
 # this whole block (backup: ~/.bashrc.bak-orca-autostart).
 if [ -x "$HOME/.config/orca/autostart-orca-serve.sh" ]; then
@@ -288,17 +288,20 @@ if [ -x "$HOME/.config/orca/cli/bin/orca" ]; then
             grep -q '"running":[[:space:]]*true' && break
         sleep 0.3
     done
-    "$HOME/.config/orca/cli/bin/orca" pair --mobile --address 127.0.0.1 2>/dev/null || true
+    "$HOME/.config/orca/cli/bin/orca" pair --mobile --address 127.0.0.1 --json 2>/dev/null |
+        sed -n 's/.*"pairingUrl": "\([^"]*\)".*/\1/p' || true
     unset _orca_i
 fi
 # <<< orca-server-autostart (UserLAnd) <<<
 EOF
 ```
 
+`--json` 출력에는 `qr` 필드도 있으므로, `pairingUrl`만 추출해 링크 한 줄만 출력한다.
+
 어떻게 확인하는가
 
 ```sh
-tail -n 18 ~/.bashrc
+tail -n 19 ~/.bashrc
 ```
 
 → 방금 넣은 마커 블록이 맨 아래에 있다.
@@ -312,7 +315,7 @@ orca status --json | grep -E '"running"|"pid"'
 tail -n 1 ~/.config/orca/logs/orca-autostart.log
 ```
 
-→ 터미널에 QR 코드와 링크가 자동으로 출력되고, `"running": true`와 PID 번호, `no server found, starting:` 로그가 보인다.
+→ 터미널에 `orca://` 링크 한 줄이 자동으로 출력되고, `"running": true`와 PID 번호, `no server found, starting:` 로그가 보인다.
 
 ### 10.5 중복 실행 확인
 
