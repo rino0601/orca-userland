@@ -101,20 +101,23 @@ sudo tar -xzf "orca-server-linux-$arch.tar.gz" -C /opt/orca-server --strip-compo
 
 ## 7. `orca` 명령 만들기
 
-서버 전용 설치의 CLI는 `orca-ide`다. 데이터를 `~/.config/orca`에 두는 `orca` 명령을 만든다.
+서버 전용 설치의 CLI는 `orca-ide`다. `status`/`pair`용으로 데이터를 `~/.config/orca`에 두는 `orca` 명령을 만든다.
 
 ```sh
 mkdir -p ~/.config/orca/cli/bin
 cat > ~/.config/orca/cli/bin/orca <<'EOF'
 #!/usr/bin/env sh
 set -eu
-export ORCA_USER_DATA_PATH="$HOME/.config/orca"
-exec /opt/orca-server/bin/orca-ide "$@"
+export ORCA_USER_DATA_PATH='/home/userland/.config/orca'
+unset NODE_OPTIONS NODE_REPL_EXTERNAL_MODULE ELECTRON_RUN_AS_NODE
+exec '/opt/orca-server/runtimes/node-c8c5721679d8d1a09e9987e345d5f9a64899bb85f7a384783ba8a93e6e62348a/bin/node' '/opt/orca-server/orcad/out/cli/index.js' "$@"
 EOF
 chmod 700 ~/.config/orca/cli/bin/orca
 echo 'export PATH="$HOME/.config/orca/cli/bin:$PATH"' >> ~/.bashrc
 export PATH="$HOME/.config/orca/cli/bin:$PATH"
 ```
+
+해시가 들어간 node 경로는 설치 릴리즈에 따라 달라진다. 이 래퍼는 `ELECTRON_RUN_AS_NODE`를 해제하므로 `status`/`pair`에는 쓰지만 `serve`에는 쓸 수 없다.
 
 어떻게 확인하는가
 
@@ -146,12 +149,12 @@ gh auth status
 ## 9. 서버 수동으로 실행하기
 
 ```sh
-orca-ide serve --bind 127.0.0.1 --pairing-address 127.0.0.1
+/opt/orca-server/bin/orca-ide serve --refuse-public --pairing-address 127.0.0.1
 ```
 
-평범한 UserLAnd 터미널에서는 `orca` 래퍼가 `ELECTRON_RUN_AS_NODE`를 해제하므로 `serve`에 쓸 수 없다. 설치된 앱 런처인 `orca-ide`를 쓴다. Orca 앱 자체 터미널처럼 `ORCA_APP_EXECUTABLE`이 설정된 곳이라면 `orca serve`도 동작한다.
+평범한 UserLAnd 터미널에서는 `orca` 래퍼가 `ELECTRON_RUN_AS_NODE`를 해제하므로 `serve`에 쓸 수 없다. PATH에 있는 `orca-ide`도 래퍼라 `orca-ide serve`는 exit 1이 난다. 릴리즈 기본 런처의 절대경로 `/opt/orca-server/bin/orca-ide`를 쓴다. Orca 앱 자체 터미널처럼 `ORCA_APP_EXECUTABLE`이 설정된 곳이라면 `orca serve`도 동작한다.
 
-`--pairing-address`는 클라이언트에 알려지는 주소이고, 서버가 실제로 듣는 인터페이스는 `--bind`가 정한다. Orca가 `--mobile-pairing needs --bind 0.0.0.0 (or no --bind); a narrower --bind cannot serve the mobile pairing offer`라고 거부하므로 좁은 bind와 함께 못 쓴다.
+`--bind`를 특정 IP로 고정하면 orcad가 `pinnedBindHost != 0.0.0.0` 상태에서 넓힘을 거부해 모바일 페어링이 `network_exposure_failed`로 실패한다. bind를 빼면 Orca가 필요할 때 모든 인터페이스로 넓힐 수 있다. `--refuse-public`은 공인 IP 요청을 거부하고 localhost/LAN/Tailscale은 허용한다. `--mobile-pairing`은 이 설정에서 함께 쓸 수 없으므로 시작 후 `orca pair --mobile`로 링크를 얻는다.
 
 첫 번째 터미널에 출력된 **bound endpoint**의 주소와 포트를 메모한다. 이 터미널은 그대로 두고 두 번째 터미널을 연다.
 
@@ -164,11 +167,13 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6768/
 
 → `"running": true`와 PID 번호, HTTP 응답 코드. 서버 전용 설치에는 웹 페이지가 없으므로 `404`가 나와도 정상이다.
 
-`--port`를 쓰지 않으면 6768을 사용하지만 6768이 이미 점유되면 다른 포트로 이동한다. 메모한 포트가 6768이 아니면 curl 주소의 포트를 그 값으로 바꿔서 확인한다. 6768로 고정하려면 `orca-ide serve --port 6768 ...`을 쓰고, 이때 6768이 점유되면 서버가 에러로 끝난다.
+`--port`를 쓰지 않으면 6768을 사용하지만 6768이 이미 점유되면 다른 포트로 이동한다. 메모한 포트가 6768이 아니면 curl 주소의 포트를 그 값으로 바꿔서 확인한다. 6768로 고정하려면 `/opt/orca-server/bin/orca-ide serve --port 6768 --refuse-public ...`을 쓰고, 이때 6768이 점유되면 서버가 에러로 끝난다.
 
 ### 페어링 링크 얻기
 
 10단계의 `.bashrc` 블록을 넣으면 새 대화형 세션을 열 때 서버 자동 실행 직후 `orca://` 링크 한 줄이 그 터미널에 출력된다. 비대화형 셸에서는 출력되지 않는다.
+
+이 기기에서 현재 떠 있는 서버는 옛 `--bind` 설정으로 시작돼 링크가 나오지 않는다. bind를 뺀 위 설정으로 다음에 재시작하면 모바일 offer가 만들어진다.
 
 서버를 재시작하지 않고 다시 받으려면 다음을 실행한다.
 
@@ -210,12 +215,14 @@ cat > ~/.config/orca/autostart-orca-serve.sh <<'EOF'
 #     "This `orca` command isn't running from an installed Orca app" (LU()).
 #   - To start the server we use the release launcher /opt/orca-server/bin/orca-ide,
 #     which sets ELECTRON_RUN_AS_NODE=1 so serve passes its app-context check.
-#   - The server is started on the loopback interface only:
-#       orca-ide serve --bind 127.0.0.1 --pairing-address 127.0.0.1
-#     It listens on 127.0.0.1:6768 (default port) and advertises that address.
-#     --mobile-pairing is deliberately omitted: Orca rejects it with any
-#     --bind other than 0.0.0.0. Get a mobile link after start with
-#     `orca pair --mobile --address 127.0.0.1` instead.
+#   - The server is started without --bind so Orca may widen it for mobile
+#     pairing, and with --refuse-public so public (non-LAN) clients are denied:
+#       orca-ide serve --refuse-public --pairing-address 127.0.0.1
+#     It advertises 127.0.0.1, reachable from the phone app on this same
+#     Android device (PRoot shares the network namespace). --mobile-pairing is
+#     omitted; get the link with `orca pair --mobile --address 127.0.0.1`.
+#   - fd 9 (the flock lock) is closed in the detached child; otherwise the
+#     long-lived server inherits it and locks out every later autostart run.
 #   - `orca serve` already refuses to start a second server for this profile
 #     (exit 3). We keep that as the final safety net and add our own checks.
 #
@@ -228,7 +235,7 @@ ORCA_BIN="${HOME}/.config/orca/cli/bin/orca"
 ORCA_SERVE_BIN="/opt/orca-server/bin/orca-ide"
 LOG_DIR="${HOME}/.config/orca/logs"
 LOG_FILE="${LOG_DIR}/orca-autostart.log"
-LOCK_FILE="${LOG_DIR}/orca-autostart.lock"
+LOCK_FILE="${LOG_DIR}/orca-autostart.lock.v2"
 
 [ -x "$ORCA_BIN" ] || exit 0
 [ -x "$ORCA_SERVE_BIN" ] || exit 0
@@ -249,6 +256,7 @@ if printf '%s' "$status_json" | grep -q '"running":[[:space:]]*true'; then
         | head -1)"
     printf '%s autostart: server already serving this profile (pid %s); no action\n' \
         "$(stamp)" "${pid:-unknown}" >>"$LOG_FILE" 2>/dev/null
+    printf 'existing %s\n' "${pid:-unknown}"
     exit 0
 fi
 
@@ -256,11 +264,12 @@ fi
 # stdin from /dev/null and both output streams appended to the log file. This
 # way closing the UserLAnd terminal cannot kill the server or leave it holding
 # the terminal's pts/stdout.
-printf '%s autostart: no server found, starting: orca-ide serve --bind 127.0.0.1 --pairing-address 127.0.0.1\n' \
+printf '%s autostart: no server found, starting: orca-ide serve --refuse-public --pairing-address 127.0.0.1\n' \
     "$(stamp)" >>"$LOG_FILE" 2>/dev/null
+printf 'started\n'
 
-nohup setsid --fork "$ORCA_SERVE_BIN" serve --bind 127.0.0.1 --pairing-address 127.0.0.1 \
-    </dev/null >>"$LOG_FILE" 2>&1 &
+nohup setsid --fork "$ORCA_SERVE_BIN" serve --refuse-public --pairing-address 127.0.0.1 \
+    </dev/null 9>&- >>"$LOG_FILE" 2>&1 &
 
 exit 0
 EOF
@@ -285,11 +294,18 @@ ls -l ~/.config/orca/autostart-orca-serve.sh ~/.config/orca/logs/orca-autostart.
 cat >> ~/.bashrc <<'EOF'
 # >>> orca-server-autostart (UserLAnd) >>>
 # Starts the local Orca runtime server once when an interactive Bash opens,
-# then prints only the orca:// pairing link in this terminal.
+# reports whether it started a new server or found an existing one, shows the
+# server log path, then prints only the orca:// pairing link in this terminal.
 # Idempotent: an already-running server is left untouched. Disable by removing
-# this whole block (backup: ~/.bashrc.bak-orca-autostart).
+# this whole block.
 if [ -x "$HOME/.config/orca/autostart-orca-serve.sh" ]; then
-    "$HOME/.config/orca/autostart-orca-serve.sh" >/dev/null 2>&1
+    _orca_autostart="$("$HOME/.config/orca/autostart-orca-serve.sh" 2>/dev/null)"
+    case "$_orca_autostart" in
+        existing*) printf 'Orca: 기존 서버 사용 (pid %s)\n' "${_orca_autostart#existing }" ;;
+        started*)  printf 'Orca: 서버를 새로 시작했습니다\n' ;;
+    esac
+    printf 'Orca 서버 로그: ~/.config/orca/logs/ (orca-autostart.log, daemon.log, orcad.trace.ndjson)\n'
+    unset _orca_autostart
 fi
 if [ -x "$HOME/.config/orca/cli/bin/orca" ]; then
     for _orca_i in 1 2 3 4 5 6 7 8 9 10; do
@@ -310,7 +326,7 @@ EOF
 어떻게 확인하는가
 
 ```sh
-tail -n 19 ~/.bashrc
+tail -n 26 ~/.bashrc
 ```
 
 → 방금 넣은 마커 블록이 맨 아래에 있다.
@@ -324,7 +340,7 @@ orca status --json | grep -E '"running"|"pid"'
 tail -n 1 ~/.config/orca/logs/orca-autostart.log
 ```
 
-→ 터미널에 `orca://` 링크 한 줄이 자동으로 출력되고, `"running": true`와 PID 번호, `no server found, starting:` 로그가 보인다.
+→ 터미널에 `Orca: 서버를 새로 시작했습니다`와 `Orca 서버 로그: ~/.config/orca/logs/ ...` 두 줄이 먼저 출력되고, 이어서 `orca://` 링크 한 줄이 나온다. 이미 떠 있는 서버라면 첫 줄 대신 `Orca: 기존 서버 사용 (pid ...)`가 나온다. `"running": true`와 PID 번호, `no server found, starting:` 로그도 보인다.
 
 ### 10.5 중복 실행 확인
 
@@ -342,6 +358,8 @@ orca status --json | grep -E '"running"|"pid"'
 ```sh
 cp ~/.bashrc.bak-orca-autostart ~/.bashrc
 ```
+
+10.1에서 만든 백업 파일 이름이다. 다른 이름으로 백업했다면 그 이름으로 바꿔서 복사한다.
 
 → 새 터미널을 열어도 자동 실행 스크립트가 돌지 않는다. 이미 떠 있는 서버는 그대로다.
 
