@@ -1,6 +1,6 @@
 # UserLAnd에서 Ubuntu 시작하고 Orca 서버 켜기
 
-UserLAnd의 Ubuntu 세션에 Orca 서버를 설치하고, 새 터미널을 열 때 서버가 저절로 켜지게 만든다. 끝나면 `orca pair --mobile`으로 얻은 새 링크로 휴대폰의 Orca 앱을 연결한다.
+UserLAnd의 Ubuntu 세션에 Orca 서버를 설치하고, 새 터미널을 열 때 서버가 저절로 켜지게 만든다. 끝나면 새 대화형 세션에 자동으로 출력되는 링크로 휴대폰의 Orca 앱을 연결한다.
 
 ## 1. Ubuntu 세션 만들기
 
@@ -166,15 +166,23 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6768/
 
 ### 페어링 링크 얻기
 
-서버를 재시작하지 않고 모바일용 QR과 링크를 만든다.
+10단계의 `.bashrc` 블록을 넣으면 새 대화형 세션을 열 때 서버 자동 실행 직후 QR 코드와 링크가 그 터미널에 출력된다. 비대화형 셸에서는 출력되지 않는다.
+
+서버를 재시작하지 않고 다시 받으려면 다음을 실행한다.
 
 ```sh
 orca pair --mobile --address 127.0.0.1
 ```
 
+강제로 새 offer를 만들려면 `--rotate`를 붙인다.
+
+```sh
+orca pair --mobile --address 127.0.0.1 --rotate
+```
+
 어떻게 확인하는가
 
-→ `The client will connect to ws://127.0.0.1:6768.`와 QR 코드, `orca://` 링크가 출력된다. 링크는 비밀번호처럼 취급한다. serve가 출력하는 링크는 시작할 때마다 새로 만들어지므로 문서에 미리 적어 둔 코드는 없다.
+→ `The client will connect to ws://127.0.0.1:6768.`와 QR 코드, `orca://` 링크가 출력된다.
 
 첫 번째 터미널에서 `Ctrl-C`로 서버를 멈춘다.
 
@@ -267,11 +275,21 @@ ls -l ~/.config/orca/autostart-orca-serve.sh ~/.config/orca/logs/orca-autostart.
 ```sh
 cat >> ~/.bashrc <<'EOF'
 # >>> orca-server-autostart (UserLAnd) >>>
-# Starts the local Orca runtime server once when an interactive Bash opens.
+# Starts the local Orca runtime server once when an interactive Bash opens,
+# then prints a fresh mobile pairing link (QR + orca:// URL) in this terminal.
 # Idempotent: an already-running server is left untouched. Disable by removing
-# these three lines (backup: ~/.bashrc.bak-orca-autostart).
+# this whole block (backup: ~/.bashrc.bak-orca-autostart).
 if [ -x "$HOME/.config/orca/autostart-orca-serve.sh" ]; then
     "$HOME/.config/orca/autostart-orca-serve.sh" >/dev/null 2>&1
+fi
+if [ -x "$HOME/.config/orca/cli/bin/orca" ]; then
+    for _orca_i in 1 2 3 4 5 6 7 8 9 10; do
+        "$HOME/.config/orca/cli/bin/orca" status --json 2>/dev/null |
+            grep -q '"running":[[:space:]]*true' && break
+        sleep 0.3
+    done
+    "$HOME/.config/orca/cli/bin/orca" pair --mobile --address 127.0.0.1 2>/dev/null || true
+    unset _orca_i
 fi
 # <<< orca-server-autostart (UserLAnd) <<<
 EOF
@@ -280,7 +298,7 @@ EOF
 어떻게 확인하는가
 
 ```sh
-tail -n 8 ~/.bashrc
+tail -n 18 ~/.bashrc
 ```
 
 → 방금 넣은 마커 블록이 맨 아래에 있다.
@@ -294,7 +312,7 @@ orca status --json | grep -E '"running"|"pid"'
 tail -n 1 ~/.config/orca/logs/orca-autostart.log
 ```
 
-→ `"running": true`와 PID 번호, `no server found, starting:` 로그
+→ 터미널에 QR 코드와 링크가 자동으로 출력되고, `"running": true`와 PID 번호, `no server found, starting:` 로그가 보인다.
 
 ### 10.5 중복 실행 확인
 
@@ -335,3 +353,11 @@ tail -n 1 ~/.config/orca/logs/orca-autostart.log
 ```
 
 → 로그 줄이 늘지 않는다.
+
+## 주의사항
+
+- 페어링 링크는 비밀번호처럼 취급한다. 화면 공유·채팅·이슈에 붙여넣지 않는다.
+- `--rotate` 전까지 같은 offer가 재사용되므로 새 터미널을 열어도 같은 링크가 나온다.
+- 서버 시작 출력과 페어링 링크는 로그와 셸 기록에 남을 수 있다(예: `~/.config/orca/logs/orca-autostart.log`). 로그 권한(600)을 유지하고 함부로 공유하지 않는다.
+- 자동 출력을 끄려면 `.bashrc`의 시작/끝 마커 블록을 지우거나 백업으로 원복한다. 이미 떠 있는 서버는 죽지 않는다.
+- 링크는 서버 재시작 시 갱신된다. 문서에 미리 적어 둔 코드는 없다.
