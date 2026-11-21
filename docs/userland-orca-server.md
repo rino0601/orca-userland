@@ -146,8 +146,10 @@ gh auth status
 ## 9. 서버 수동으로 실행하기
 
 ```sh
-orca serve --bind 127.0.0.1 --pairing-address 127.0.0.1
+orca-ide serve --bind 127.0.0.1 --pairing-address 127.0.0.1
 ```
+
+평범한 UserLAnd 터미널에서는 `orca` 래퍼가 `ELECTRON_RUN_AS_NODE`를 해제하므로 `serve`에 쓸 수 없다. 설치된 앱 런처인 `orca-ide`를 쓴다. Orca 앱 자체 터미널처럼 `ORCA_APP_EXECUTABLE`이 설정된 곳이라면 `orca serve`도 동작한다.
 
 `--pairing-address`는 클라이언트에 알려지는 주소이고, 서버가 실제로 듣는 인터페이스는 `--bind`가 정한다. Orca가 `--mobile-pairing needs --bind 0.0.0.0 (or no --bind); a narrower --bind cannot serve the mobile pairing offer`라고 거부하므로 좁은 bind와 함께 못 쓴다.
 
@@ -162,7 +164,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6768/
 
 → `"running": true`와 PID 번호, HTTP 응답 코드. 서버 전용 설치에는 웹 페이지가 없으므로 `404`가 나와도 정상이다.
 
-`--port`를 쓰지 않으면 6768을 사용하지만 6768이 이미 점유되면 다른 포트로 이동한다. 메모한 포트가 6768이 아니면 curl 주소의 포트를 그 값으로 바꿔서 확인한다. 6768로 고정하려면 `orca serve --port 6768 ...`을 쓰고, 이때 6768이 점유되면 서버가 에러로 끝난다.
+`--port`를 쓰지 않으면 6768을 사용하지만 6768이 이미 점유되면 다른 포트로 이동한다. 메모한 포트가 6768이 아니면 curl 주소의 포트를 그 값으로 바꿔서 확인한다. 6768로 고정하려면 `orca-ide serve --port 6768 ...`을 쓰고, 이때 6768이 점유되면 서버가 에러로 끝난다.
 
 ### 페어링 링크 얻기
 
