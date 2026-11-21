@@ -23,4 +23,4 @@ cat .git/hooks/pre-commit
 
 → `prek 0.5.11` 이상이 출력되고, 훅에 `exec uv run prek hook-impl ...` 한 줄이 들어 있다.
 
-훅이 실행 파일 경로가 아니라 런처 명령을 적는 이유는 [git 훅과 `--hook-command`](../explanation/hook-command.md)에 있다. 문서 사이트가 빌드되는지는 `uv run zensical build`로 따로 확인할 수 있다.
+훅이 실행 파일 경로가 아니라 런처 명령을 적는 이유는 [git 훅과 `--hook-command`](../explanation/hook-command.md)에 있다. 커밋 전 검증은 `mise run check`로 한 번에 확인할 수 있다.
