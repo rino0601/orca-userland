@@ -342,4 +342,5 @@ tail -n 1 ~/.config/orca/logs/orca-autostart.log
 - 자동 실행을 끄거나 되돌리기: [자동 실행 끄기·되돌리기](../how-to/disable-autostart.md)
 - 문제가 생겼을 때: [서버가 안 뜰 때 진단하기](../how-to/diagnose-server-not-starting.md)
 - 플래그·경로·버전의 정확한 값: [CLI와 serve 플래그](../reference/cli-and-serve.md), [경로와 버전](../reference/paths-and-versions.md)
+- 프로세스 모니터링 도구(btop/htop)와 환경 제약: [UserLAnd/PRoot 환경](../explanation/userland-proot.md)
 - 왜 이렇게 구성했는가: [Diátaxis 4분류 개요](../explanation/diataxis.md), [serve 런처와 앱 컨텍스트](../explanation/serve-launcher.md)

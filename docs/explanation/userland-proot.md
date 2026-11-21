@@ -12,6 +12,18 @@ UserLAnd의 Ubuntu는 커널을 따로 띄우지 않는다. Android 커널 위�
 
 이 기기는 arm64(aarch64)다. 그래서 바이너리를 x86_64용으로 받으면 실행되지 않는다. `gh`를 apt가 아니라 `gh_2.105.0_linux_arm64.tar.gz` 릴리즈로 받는 것도 이 때문이다. Orca 서버 역시 `uname -m`을 `aarch64 → arm64`로 바꿔 릴리즈 자산 이름을 만든다. Node 런타임 경로에 해시가 붙는 것도 릴리즈가 아키텍처별로 번들되기 때문이다.
 
+## 프로세스 모니터링에서 btop과 htop의 차이
+
+`btop`은 시작할 때 `/sys/devices`를 순회하다가 다음 오류로 끝날 수 있다.
+
+```text
+ERROR: Exception in Shared::init() -> filesystem error:directory iterator cannot open directory: Permission denied [/sys/devices]
+```
+
+앞서 본 것처럼 PRoot은 커널을 새로 띄우지 않고 파일 시스템 뷰를 사용자 공간에서 만든다. 커널이 내보내는 `/sys` 아래 항목은 이 뷰에서 접근 권한이 데스크톱과 같지 않다. btop이 `/sys/devices`에서 정보를 읽으려 할 때 권한이 막히면 위 오류가 나온다.
+
+`htop`은 리눅스에서 `/proc`를 읽어 프로세스 정보를 만든다. 이 경로는 UserLAnd 세션에서도 접근할 수 있으므로, 프로세스를 볼 때는 htop을 권장한다. 설치 명령과 버전은 [경로와 버전](../reference/paths-and-versions.md)에 있다.
+
 ## 이 환경이 자동 실행 설계에 미치는 영향
 
 로그인 셸이 매번 새로 만들어지는 모바일 터미널 특성상, 서버를 한 번 띄워 두고 재사용하는 편이 안정적이다. PRoot 세션이 닫히면 터미널이 죽고, 그 터미널이 서버를 붙잡고 있으면 서버도 같이 끊긴다. 그래서 자동 실행 스크립트는 `setsid`와 `nohup`으로 서버를 터미널에서 분리한다([flock 락과 idempotent 자동 실행](flock-autostart.md) 참고).
