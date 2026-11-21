@@ -202,15 +202,18 @@ cat > ~/.config/orca/autostart-orca-serve.sh <<'EOF'
 #!/usr/bin/env sh
 # Auto-start the local Orca runtime server from an interactive UserLAnd Bash.
 #
-# Design notes:
-#   - The installed CLI wrapper is ~/.config/orca/cli/bin/orca and it execs
-#     /opt/orca-server/.../orcad/out/cli/index.js with ORCA_USER_DATA_PATH set.
-#   - The server that was being run manually is:
-#       orca serve --bind 127.0.0.1 --pairing-address 127.0.0.1
-#     Without --port it uses 6768 and moves to another port when 6768 is taken,
-#     so read the bound endpoint printed at startup. --bind 127.0.0.1 keeps the
-#     runtime on loopback, which UserLAnd shares with the Android device (PRoot
-#     shares the Android network namespace).
+# Design notes (verified on this device, 2026-11-21):
+#   - The CLI wrapper ~/.config/orca/cli/bin/orca is for status/pair only. It
+#     unsets ELECTRON_RUN_AS_NODE, so `orca serve` through it fails with
+#     "This `orca` command isn't running from an installed Orca app" (LU()).
+#   - To start the server we use the release launcher /opt/orca-server/bin/orca-ide,
+#     which sets ELECTRON_RUN_AS_NODE=1 so serve passes its app-context check.
+#   - The server is started on the loopback interface only:
+#       orca-ide serve --bind 127.0.0.1 --pairing-address 127.0.0.1
+#     It listens on 127.0.0.1:6768 (default port) and advertises that address.
+#     --mobile-pairing is deliberately omitted: Orca rejects it with any
+#     --bind other than 0.0.0.0. Get a mobile link after start with
+#     `orca pair --mobile --address 127.0.0.1` instead.
 #   - `orca serve` already refuses to start a second server for this profile
 #     (exit 3). We keep that as the final safety net and add our own checks.
 #
@@ -220,11 +223,13 @@ cat > ~/.config/orca/autostart-orca-serve.sh <<'EOF'
 set -u
 
 ORCA_BIN="${HOME}/.config/orca/cli/bin/orca"
+ORCA_SERVE_BIN="/opt/orca-server/bin/orca-ide"
 LOG_DIR="${HOME}/.config/orca/logs"
 LOG_FILE="${LOG_DIR}/orca-autostart.log"
 LOCK_FILE="${LOG_DIR}/orca-autostart.lock"
 
 [ -x "$ORCA_BIN" ] || exit 0
+[ -x "$ORCA_SERVE_BIN" ] || exit 0
 mkdir -p "$LOG_DIR" 2>/dev/null || exit 0
 
 stamp() { date '+%Y-%m-%d %H:%M:%S %z'; }
@@ -249,10 +254,10 @@ fi
 # stdin from /dev/null and both output streams appended to the log file. This
 # way closing the UserLAnd terminal cannot kill the server or leave it holding
 # the terminal's pts/stdout.
-printf '%s autostart: no server found, starting: orca serve --bind 127.0.0.1 --pairing-address 127.0.0.1\n' \
+printf '%s autostart: no server found, starting: orca-ide serve --bind 127.0.0.1 --pairing-address 127.0.0.1\n' \
     "$(stamp)" >>"$LOG_FILE" 2>/dev/null
 
-nohup setsid --fork "$ORCA_BIN" serve --bind 127.0.0.1 --pairing-address 127.0.0.1 \
+nohup setsid --fork "$ORCA_SERVE_BIN" serve --bind 127.0.0.1 --pairing-address 127.0.0.1 \
     </dev/null >>"$LOG_FILE" 2>&1 &
 
 exit 0
@@ -261,6 +266,8 @@ chmod 700 ~/.config/orca/autostart-orca-serve.sh
 touch ~/.config/orca/logs/orca-autostart.log
 chmod 600 ~/.config/orca/logs/orca-autostart.log
 ```
+
+`status`/`pair`는 래퍼로 충분하지만 `serve`는 설치된 앱 런처(`orca-ide`)가 필요하다. 래퍼가 `ELECTRON_RUN_AS_NODE`를 해제하면 LU()의 앱 컨텍스트 검사를 통과하지 못하므로, 그대로 두면 재시작 때 서버가 뜨지 않는다.
 
 어떻게 확인하는가
 
