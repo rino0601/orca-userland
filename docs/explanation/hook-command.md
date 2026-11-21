@@ -18,4 +18,4 @@ uv가 만든 `.venv`는 저장소 안에 있으며 worktree마다 따로 생긴�
 
 ## 여전히 필요한 조건
 
-이 방식은 `uv`가 PATH에 있어야 동작한다. worktree에서 mise 설정이 신뢰되지 않은 상태라면 mise가 uv를 PATH에 넣지 못하므로 훅이 여전히 실패할 수 있다. 이 저장소에는 아직 prek 설정 파일이 없으므로 설치할 때 `--allow-missing-config`를 붙여 shim이 검사를 건너뛰게 한다. 설정 파일이 생기면 같은 shim이 그대로 훅을 실행한다. 도구 버전과 경로 값은 [경로와 버전 레퍼런스](../reference/paths-and-versions.md)에 정리되어 있다.
+이 방식은 `uv`가 PATH에 있어야 동작한다. worktree에서 mise 설정이 신뢰되지 않은 상태라면 mise가 uv를 PATH에 넣지 못하므로 훅이 여전히 실패할 수 있다. `--allow-missing-config`는 설정 파일이 없는 worktree에서도 커밋이 막히지 않게 하는 안전장치이며, 이 저장소에는 `prek.toml`이 있어 같은 shim이 정의된 검사를 실제로 실행한다. 도구 버전과 경로 값은 [경로와 버전 레퍼런스](../reference/paths-and-versions.md)에 정리되어 있다.

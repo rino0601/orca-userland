@@ -12,7 +12,7 @@
 mise run setup
 ```
 
-예상 결과: `uv sync`가 의존성을 확인한 뒤 `prek install`이 `.git/hooks/pre-commit`을 만든다. 훅이 이미 있으면 `Overwriting existing hook ...`과 함께 같은 내용으로 덮어쓴다. prek 설정 파일이 아직 없어도 커밋이 막히지 않도록 `--allow-missing-config`가 함께 적용된다.
+예상 결과: `uv sync`가 의존성을 확인한 뒤 `prek install`이 `.git/hooks/pre-commit`을 만든다. 훅이 이미 있으면 `Overwriting existing hook ...`과 함께 같은 내용으로 덮어쓴다. `prek.toml`에 정의된 검사는 커밋 때 실제로 실행되고, 설정 파일이 없는 worktree에서는 `--allow-missing-config`가 검사를 건너뛰게 한다.
 
 ## 2. 확인
 
