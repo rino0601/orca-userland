@@ -39,7 +39,11 @@ curl -fsSL https://mise.run | sh
 
 → 버전 번호
 
-## 4. opencode 설치
+## 4. 코딩 에이전트 설치하기
+
+원하는 도구를 하나 이상 선택해 설치하세요. `opencode`만, `codex`만, 또는 둘 다 설치할 수 있다. 둘 다 터미널에서 쓰는 코딩 에이전트이고, 어느 쪽을 골라도 뒤 단계는 같다.
+
+### 4.1 opencode
 
 ```sh
 curl -fsSL https://opencode.ai/install | bash
@@ -47,6 +51,18 @@ curl -fsSL https://opencode.ai/install | bash
 
 ```sh
 ~/.opencode/bin/opencode --version
+```
+
+→ 버전 번호
+
+### 4.2 codex
+
+```sh
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+```
+
+```sh
+~/.local/bin/codex --version
 ```
 
 → 버전 번호
