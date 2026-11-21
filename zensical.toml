@@ -4,5 +4,26 @@ site_description = "mise + uv + zensical 개발 환경"
 
 nav = [
     { "Home" = "index.md" },
-    { "UserLAnd에서 Orca 서버 시작하기" = "userland-orca-server.md" },
+    { "튜토리얼" = [
+        { "UserLAnd에서 Orca 서버 시작하기" = "tutorials/userland-orca-server.md" },
+    ]},
+    { "실전 가이드" = [
+        { "모바일 페어링 링크 다시 얻기" = "how-to/get-mobile-pairing-link.md" },
+        { "자동 실행 다시 켜기" = "how-to/enable-autostart.md" },
+        { "자동 실행 끄기·되돌리기" = "how-to/disable-autostart.md" },
+        { "서버 로그에서 상태·오류 확인하기" = "how-to/check-server-logs.md" },
+        { "gh 바이너리를 GitHub 릴리즈로 설치하기" = "how-to/install-gh-from-release.md" },
+        { "서버가 안 뜰 때 진단하기" = "how-to/diagnose-server-not-starting.md" },
+    ]},
+    { "레퍼런스" = [
+        { "CLI와 serve 플래그" = "reference/cli-and-serve.md" },
+        { "경로와 버전" = "reference/paths-and-versions.md" },
+    ]},
+    { "설명" = [
+        { "Diátaxis 4분류 개요" = "explanation/diataxis.md" },
+        { "UserLAnd/PRoot 환경" = "explanation/userland-proot.md" },
+        { "serve 런처와 앱 컨텍스트" = "explanation/serve-launcher.md" },
+        { "모바일 페어링과 네트워크 노출" = "explanation/mobile-pairing-network.md" },
+        { "flock 락과 idempotent 자동 실행" = "explanation/flock-autostart.md" },
+    ]},
 ]
