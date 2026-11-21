@@ -4,3 +4,10 @@ uv = "0.13.9"
 [env]
 # uv는 프로젝트 고유의 Python을 직접 설치하고 관리한다.
 UV_PYTHON = "3.13"
+
+[tasks.setup]
+description = "dev 의존성을 동기화하고 버전 독립적인 git 훅을 설치한다"
+run = [
+    "uv sync",
+    "uv run prek install --force --allow-missing-config --hook-command 'uv run prek'",
+]

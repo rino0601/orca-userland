@@ -26,6 +26,7 @@
 | uv | `0.13.9` | `uv --version` |
 | Python | `3.13.18` | `uv run python --version` |
 | zensical | `0.1.3` | `uv run zensical --version` |
+| prek | `0.5.11` | `uv run prek --version` |
 | gh | `2.105.0` | `gh --version` |
 | opencode | `2.3.2` | `~/.opencode/bin/opencode --version` |
 | orca-ide | `1.4.267` | `/opt/orca-server/bin/orca-ide --version` |

@@ -8,6 +8,7 @@ nav = [
         { "UserLAnd에서 Orca 서버 시작하기" = "tutorials/userland-orca-server.md" },
     ]},
     { "실전 가이드" = [
+        { "개발 환경 설정하기" = "how-to/run-setup.md" },
         { "모바일 페어링 링크 다시 얻기" = "how-to/get-mobile-pairing-link.md" },
         { "자동 실행 다시 켜기" = "how-to/enable-autostart.md" },
         { "자동 실행 끄기·되돌리기" = "how-to/disable-autostart.md" },
@@ -21,6 +22,7 @@ nav = [
     ]},
     { "설명" = [
         { "Diátaxis 4분류 개요" = "explanation/diataxis.md" },
+        { "git 훅과 --hook-command" = "explanation/hook-command.md" },
         { "UserLAnd/PRoot 환경" = "explanation/userland-proot.md" },
         { "serve 런처와 앱 컨텍스트" = "explanation/serve-launcher.md" },
         { "모바일 페어링과 네트워크 노출" = "explanation/mobile-pairing-network.md" },
