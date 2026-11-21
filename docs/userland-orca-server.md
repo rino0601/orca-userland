@@ -1,6 +1,6 @@
 # UserLAnd에서 Ubuntu 시작하고 Orca 서버 켜기
 
-UserLAnd의 Ubuntu 세션에 Orca 서버를 설치하고, 새 터미널을 열 때 서버가 저절로 켜지게 만든다. 끝나면 서버가 시작할 때 출력하는 새 링크로 휴대폰의 Orca 앱을 연결한다.
+UserLAnd의 Ubuntu 세션에 Orca 서버를 설치하고, 새 터미널을 열 때 서버가 저절로 켜지게 만든다. 끝나면 `orca pair --mobile`으로 얻은 새 링크로 휴대폰의 Orca 앱을 연결한다.
 
 ## 1. Ubuntu 세션 만들기
 
@@ -61,24 +61,24 @@ curl -fsSL https://opencode.ai/install | bash
 
 ## 5. gh 설치
 
+이 시스템에서는 더 높은 버전을 위해 릴리즈에서 직접 받는다.
+
 ```sh
-sudo mkdir -p -m 755 /etc/apt/keyrings
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-  | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
-sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-  | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-sudo apt update
-sudo apt install -y gh
+arch=$(dpkg --print-architecture)
+version=2.105.0
+curl -fL https://github.com/cli/cli/releases/download/v${version}/gh_${version}_linux_${arch}.tar.gz -o /tmp/gh.tar.gz
+tar -xzf /tmp/gh.tar.gz -C /tmp
+install -m 755 /tmp/gh_${version}_linux_${arch}/bin/gh $HOME/.local/bin/gh
 ```
 
 어떻게 확인하는가
 
 ```sh
 gh --version
+gh auth status
 ```
 
-→ `gh version ...`
+→ `gh version 2.105.0 ...`, `You are not logged into any GitHub hosts.`
 
 ## 6. Orca 서버 설치
 
@@ -146,12 +146,12 @@ gh auth status
 ## 9. 서버 수동으로 실행하기
 
 ```sh
-orca serve --mobile-pairing --pairing-address 127.0.0.1
+orca serve --bind 127.0.0.1 --pairing-address 127.0.0.1
 ```
 
-`--pairing-address`는 클라이언트에 알려지는 주소이고, 서버가 실제로 듣는 인터페이스는 `--bind`가 정한다. 여기서는 `--bind`를 쓰지 않으므로 모든 인터페이스에서 듣는다. `--mobile-pairing`은 출력되는 링크를 모바일용 QR/링크로 바꾸는 옵션이다.
+`--pairing-address`는 클라이언트에 알려지는 주소이고, 서버가 실제로 듣는 인터페이스는 `--bind`가 정한다. Orca가 `--mobile-pairing needs --bind 0.0.0.0 (or no --bind); a narrower --bind cannot serve the mobile pairing offer`라고 거부하므로 좁은 bind와 함께 못 쓴다.
 
-첫 번째 터미널에 출력된 **bound endpoint**의 주소와 포트를 메모한다. QR 코드와 페어링 링크도 여기서 출력된다. 이 터미널은 그대로 두고 두 번째 터미널을 연다.
+첫 번째 터미널에 출력된 **bound endpoint**의 주소와 포트를 메모한다. 이 터미널은 그대로 두고 두 번째 터미널을 연다.
 
 어떻게 확인하는가 (두 번째 터미널)
 
@@ -166,7 +166,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:6768/
 
 ### 페어링 링크 얻기
 
-serve가 출력하는 링크는 시작할 때마다 새로 만들어진다. 문서에 미리 적어 둔 코드는 없으므로 방금 출력된 QR 또는 링크만 사용한다. 나중에 다시 필요하면 서버를 재시작하지 않고 새 링크를 만든다.
+서버를 재시작하지 않고 모바일용 QR과 링크를 만든다.
 
 ```sh
 orca pair --mobile --address 127.0.0.1
@@ -174,7 +174,7 @@ orca pair --mobile --address 127.0.0.1
 
 어떻게 확인하는가
 
-→ 새 QR 코드와 `orca://` 링크가 출력된다.
+→ `The client will connect to ws://127.0.0.1:6768.`와 QR 코드, `orca://` 링크가 출력된다. 링크는 비밀번호처럼 취급한다. serve가 출력하는 링크는 시작할 때마다 새로 만들어지므로 문서에 미리 적어 둔 코드는 없다.
 
 첫 번째 터미널에서 `Ctrl-C`로 서버를 멈춘다.
 
@@ -198,10 +198,10 @@ cat > ~/.config/orca/autostart-orca-serve.sh <<'EOF'
 #   - The installed CLI wrapper is ~/.config/orca/cli/bin/orca and it execs
 #     /opt/orca-server/.../orcad/out/cli/index.js with ORCA_USER_DATA_PATH set.
 #   - The server that was being run manually is:
-#       orca serve --mobile-pairing --pairing-address 127.0.0.1
+#       orca serve --bind 127.0.0.1 --pairing-address 127.0.0.1
 #     Without --port it uses 6768 and moves to another port when 6768 is taken,
-#     so read the bound endpoint printed at startup. It binds 0.0.0.0 internally,
-#     which is what makes 127.0.0.1 work from the same Android device (PRoot
+#     so read the bound endpoint printed at startup. --bind 127.0.0.1 keeps the
+#     runtime on loopback, which UserLAnd shares with the Android device (PRoot
 #     shares the Android network namespace).
 #   - `orca serve` already refuses to start a second server for this profile
 #     (exit 3). We keep that as the final safety net and add our own checks.
@@ -241,10 +241,10 @@ fi
 # stdin from /dev/null and both output streams appended to the log file. This
 # way closing the UserLAnd terminal cannot kill the server or leave it holding
 # the terminal's pts/stdout.
-printf '%s autostart: no server found, starting: orca serve --mobile-pairing --pairing-address 127.0.0.1\n' \
+printf '%s autostart: no server found, starting: orca serve --bind 127.0.0.1 --pairing-address 127.0.0.1\n' \
     "$(stamp)" >>"$LOG_FILE" 2>/dev/null
 
-nohup setsid --fork "$ORCA_BIN" serve --mobile-pairing --pairing-address 127.0.0.1 \
+nohup setsid --fork "$ORCA_BIN" serve --bind 127.0.0.1 --pairing-address 127.0.0.1 \
     </dev/null >>"$LOG_FILE" 2>&1 &
 
 exit 0
