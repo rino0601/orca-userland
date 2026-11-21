@@ -33,6 +33,16 @@
 
 이 시스템은 UserLAnd 위 Ubuntu 26.04.1 LTS arm64다. gh는 apt가 아니라 `gh_2.105.0_linux_arm64.tar.gz` 릴리즈를 `curl`로 받아 설치한다.
 
+## 선택적 도구
+
+서버 실행에는 필요하지 않고, 프로세스를 확인할 때 쓰는 도구다.
+
+| 도구 | 용도 | 설치 명령 | apt 후보 버전 | 확인 명령 |
+| --- | --- | --- | --- | --- |
+| htop | 프로세스·자원 모니터링 | `sudo apt install htop` | `3.4.1-5build2` | `htop --version` |
+
+htop은 `/proc`를 읽어 프로세스 정보를 표시한다. btop이 이 환경에서 실패할 수 있는 이유는 [UserLAnd/PRoot 환경](../explanation/userland-proot.md)에 기술했다.
+
 ## 현재 서버 프로세스
 
 | 항목 | 값 |
