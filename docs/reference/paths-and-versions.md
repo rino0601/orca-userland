@@ -29,6 +29,7 @@
 | prek | `0.5.11` | `uv run prek --version` |
 | gh | `2.105.0` | `gh --version` |
 | opencode | `2.3.2` | `~/.opencode/bin/opencode --version` |
+| htop | `3.4.1` (apt 후보 `3.4.1-5build2`) | `htop --version` |
 | orca-ide | `1.4.267` | `/opt/orca-server/bin/orca-ide --version` |
 
 이 시스템은 UserLAnd 위 Ubuntu 26.04.1 LTS arm64다. gh는 apt가 아니라 `gh_2.105.0_linux_arm64.tar.gz` 릴리즈를 `curl`로 받아 설치한다.
