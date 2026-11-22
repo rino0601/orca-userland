@@ -2,6 +2,8 @@
 site_name = "Orca Userland"
 site_description = "mise + uv + zensical 개발 환경"
 
+extra_javascript = ["javascripts/code-copy-a11y.js"]
+
 nav = [
     { "Home" = "index.md" },
     { "튜토리얼" = [
@@ -29,3 +31,7 @@ nav = [
         { "flock 락과 idempotent 자동 실행" = "explanation/flock-autostart.md" },
     ]},
 ]
+
+[project.theme]
+language = "ko"
+features = ["content.code.copy"]
