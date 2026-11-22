@@ -54,6 +54,23 @@ htop --version
 curl -fsSL https://mise.run | sh
 ```
 
+설치가 끝나면 설치기가 셸 활성화 방법을 안내한다. 이 기기의 셸은 bash이고 mise는 `~/.local/bin/mise`에 설치되므로 다음 한 줄이 출력된다.
+
+```
+mise: run the following to activate mise in your shell:
+echo "eval \"\$($HOME/.local/bin/mise activate bash)\"" >> ~/.bashrc
+
+mise: run `mise doctor` to verify this is set up correctly
+```
+
+이 줄을 `~/.bashrc`에 넣으면 새 셸을 열거나 프로젝트 디렉터리로 이동할 때 `mise.toml`에 고정한 도구 버전이 자동으로 활성화된다. 넣지 않으면 `mise use`로 지정한 uv 같은 버전이 PATH에 자동으로 잡히지 않는다. 출력된 명령을 실행하고 `source`로 지금 셸에 적용한다(새 터미널을 열어도 된다). 마지막으로 `mise doctor`로 확인한다.
+
+```sh
+echo "eval \"\$($HOME/.local/bin/mise activate bash)\"" >> ~/.bashrc
+source ~/.bashrc
+mise doctor
+```
+
 ```sh
 ~/.local/bin/mise --version
 ```
