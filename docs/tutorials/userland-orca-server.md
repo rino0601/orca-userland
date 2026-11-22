@@ -32,6 +32,22 @@ cc --version | head -1
 
 `apt`는 터미널에서 쓰는 권장 명령이다. `apt-get`은 예전 저수준 명령으로 스크립트에서 여전히 쓰인다.
 
+### 프로세스 모니터: htop (권장, 선택)
+
+필수는 아니지만 UserLAnd에서 프로세스를 볼 때 `htop`을 권장한다.
+
+```sh
+sudo apt install htop
+```
+
+```sh
+htop --version
+```
+
+→ `htop 3.4.1 ...` 출력
+
+`btop` 대신 `htop`을 권장하는 이유는 [UserLAnd/PRoot 환경](../explanation/userland-proot.md)에 있다.
+
 ## 3. mise 설치
 
 ```sh
