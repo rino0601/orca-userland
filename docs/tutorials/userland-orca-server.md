@@ -371,6 +371,8 @@ tail -n 1 ~/.config/orca/logs/orca-autostart.log
 
 ## 다음 읽을거리
 
+- 설치한 서버의 버전 바꾸기: [Orca 서버 업그레이드](../how-to/upgrade-orca-server.md)
+
 - 링크 다시 발급·강제 갱신: [모바일 페어링 링크 다시 얻기](../how-to/get-mobile-pairing-link.md)
 - 자동 실행을 끄거나 되돌리기: [자동 실행 끄기·되돌리기](../how-to/disable-autostart.md)
 - 문제가 생겼을 때: [서버가 안 뜰 때 진단하기](../how-to/diagnose-server-not-starting.md)
