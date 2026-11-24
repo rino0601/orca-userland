@@ -1,0 +1,261 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+die() { printf '%s\n' "$*" >&2; exit 1; }
+
+if [[ $# -lt 2 || $# -gt 3 ]]; then
+    die 'Usage: upgrade-orca-server {--plan|--prepare|--apply} [v]MAJOR.MINOR.PATCH [WORKDIR]'
+fi
+mode=$1
+version=${2#v}
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die 'Specify an exact stable release version.'
+[[ $mode == --plan || $mode == --prepare || $mode == --apply ]] || die 'Unknown mode.'
+if [[ $mode == --apply ]]; then
+    [[ $# == 3 ]] || die 'Pass the directory printed by --prepare.'
+else
+    [[ $# == 2 ]] || die 'WORKDIR is only accepted with --apply.'
+fi
+case $(uname -m) in
+    aarch64|arm64) arch=arm64 ;;
+    x86_64|amd64) arch=x64 ;;
+    *) die 'Only Linux ARM64 and x64 are supported.' ;;
+esac
+[[ $(uname -s) == Linux ]] || die 'This upgrade is for Linux.'
+
+# The override permits isolated runs without touching /opt.
+install_dir=${ORCA_UPGRADE_INSTALL_DIR:-/opt/orca-server}
+profile=$HOME/.config/orca
+wrapper=$profile/cli/bin/orca
+archive=orca-server-linux-$arch.tar.gz
+manifest=orca-server-sha256sums.txt
+base=https://github.com/stablyai/orca/releases/download/v$version
+
+if [[ $mode == --plan ]]; then
+    printf 'Release: v%s (%s)\nArchive: %s/%s\nChecksums: %s/%s\nInstall: %s\nProfile: %s\n' \
+        "$version" "$arch" "$base" "$archive" "$base" "$manifest" "$install_dir" "$profile"
+    printf '%s\n' 'Prepare and verify in a private work directory. In an independent terminal, disable autostart and stop this profile. Apply backs up the profile and old install, switches the package and CLI wrapper, and checks both versions. Restart and verify the existing mobile connection separately.'
+    printf '%s\n' 'Apply also backs up ~/.bashrc, removes the Orca autostart block for the switch, and restores it on success, failure, or interruption.'
+    exit
+fi
+[[ $EUID != 0 ]] || die 'Run as the profile owner. The script invokes sudo for install files only.'
+
+check_archive() {
+    local digest
+    digest=$(awk -v asset="$archive" '
+        $2 == asset || $2 == "*" asset {
+            if (length($1) != 64 || $1 !~ /^[0-9a-fA-F]+$/) exit 1
+            print $1
+            count++
+        }
+        END { if (count != 1) exit 1 }
+    ' "$manifest") || die "Expected one SHA-256 entry for $archive."
+    printf '%s  %s\n' "$digest" "$archive" | sha256sum --check --strict -
+}
+
+probe() {
+    mkdir -p "$probe_home"
+    env -u NODE_OPTIONS -u NODE_REPL_EXTERNAL_MODULE -u ELECTRON_RUN_AS_NODE \
+        -u ORCA_APP_EXECUTABLE -u ORCA_SERVE_RUNTIME \
+        HOME="$probe_home" XDG_CONFIG_HOME="$probe_home/config" \
+        XDG_DATA_HOME="$probe_home/data" XDG_CACHE_HOME="$probe_home/cache" \
+        XDG_STATE_HOME="$probe_home/state" XDG_RUNTIME_DIR="$probe_home" \
+        ORCA_USER_DATA_PATH="$probe_home/profile" "$@"
+}
+
+node_path() {
+    local runtime
+    runtime=$(cat "$1/orcad/.runtime-node") || return
+    [[ $runtime =~ ^[0-9a-f]{64}$ ]] || return 1
+    printf '%s/runtimes/node-%s/bin/node\n' "$1" "$runtime"
+}
+
+extract_package() (
+    # The work directory is private. Preserve read/execute access after
+    # the package is copied into the root-owned installation.
+    umask 022
+    mkdir -- "$1"
+    tar --extract --gzip --file "$archive" --directory "$1" --strip-components=1 \
+        --no-same-owner --no-same-permissions
+)
+
+if [[ $mode == --prepare ]]; then
+    tmp_root=$(realpath -e -- "${TMPDIR:-/tmp}")
+    work=$(mktemp -d "$tmp_root/orca-upgrade.XXXXXXXX")
+    trap 'rm -rf -- "$work"' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    cd "$work"
+    for asset in "$archive" "$manifest"; do
+        curl --disable --fail --silent --show-error --location --proto '=https' \
+            --proto-redir '=https' --output "$asset" "$base/$asset"
+    done
+    check_archive
+    probe_home=$work/probe
+    extract_package "$work/package"
+    node=$(node_path "$work/package") || die 'Unrecognized bundled Node metadata.'
+    [[ -x $node && -f package/orcad/out/cli/index.js ]] || die 'Incomplete server package.'
+    [[ $(probe ./package/bin/orca-ide --version) == "$version" ]] || die 'Launcher version mismatch.'
+    [[ $(probe "$node" "$work/package/orcad/out/cli/index.js" --version) == "$version" ]] \
+        || die 'CLI version mismatch.'
+    rm -rf -- "$work/package" "$probe_home"
+    printf '%s\n' "$version $arch" > prepared
+    trap - EXIT
+    printf 'Prepared v%s. WORKDIR=%s\n' "$version" "$work"
+    exit
+fi
+
+work=$(realpath -e -- "$3")
+[[ -O $work && $(stat -c %a "$work") == 700 ]] || die 'Use the private directory created by --prepare.'
+[[ $install_dir = /* && $work != "$install_dir" && $work != "$install_dir/"* ]] \
+    || die 'Use an absolute install path and a work directory outside the installation.'
+live_profile=$(realpath -e -- "$profile")
+[[ $work != "$live_profile" && $work != "$live_profile/"* ]] \
+    || die 'Use a work directory outside the live profile.'
+cd "$work"
+[[ $(cat prepared) == "$version $arch" ]] || die 'Prepared release or architecture mismatch.'
+[[ -d $install_dir && ! -L $install_dir && -x $install_dir/bin/orca-ide &&
+    ! -L $profile && -f $wrapper && -x $wrapper && ! -L $wrapper ]] \
+    || die 'Expected the tutorial install and a regular executable CLI wrapper.'
+bashrc=$HOME/.bashrc
+autostart_start='# >>> orca-server-autostart (UserLAnd) >>>'
+autostart_end='# <<< orca-server-autostart (UserLAnd) <<<'
+bashrc_have=0
+if [[ -L $bashrc ]]; then
+    die 'Cannot use a symbolic link as .bashrc for the autostart block check.'
+fi
+if [[ -e $bashrc ]]; then
+    [[ -f $bashrc && -r $bashrc ]] || die 'Cannot read .bashrc to check the autostart block.'
+    [[ -O $bashrc ]] || die 'Cannot preserve .bashrc ownership. Run as the file owner.'
+    marker_info=$(awk -v start="$autostart_start" -v end="$autostart_end" '
+        $0 == start { starts++; if (!first_start) first_start = NR }
+        $0 == end { ends++; if (!first_end) first_end = NR }
+        END { printf "%d %d %d %d\n", starts, ends, first_start, first_end }
+    ' "$bashrc") || die 'Cannot inspect .bashrc for autostart markers.'
+    read -r start_count end_count start_line end_line <<<"$marker_info"
+    if (( start_count == 0 && end_count == 0 )); then
+        bashrc_have=0
+    elif (( start_count != 1 || end_count != 1 || start_line >= end_line )); then
+        die 'Malformed Orca autostart block in .bashrc: expected exactly one start and one end marker with the start first. Fix the markers before applying.'
+    else
+        bashrc_have=1
+    fi
+fi
+
+check_archive
+stage=$(mktemp -d "$work/stage.XXXXXXXX")
+trap 'rm -rf -- "$stage"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+extract_package "$stage/package"
+staged_node=$(node_path "$stage/package") || die 'Unrecognized bundled Node metadata.'
+node=$install_dir/${staged_node#"$stage/package/"}
+probe_home=$stage/probe
+
+mkdir -p "$profile/logs"
+exec 9>>"$profile/logs/orca-autostart.lock.v2"
+flock -n 9 || die 'Autostart or another upgrade holds the profile lock.'
+status=$("$wrapper" status --json) || die 'Cannot determine server status using the installed wrapper.'
+probe "$staged_node" -e '
+    const data = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+    if (!(data.ok === true && data.result?.app?.running === false &&
+          data.result?.runtime?.state === "not_running")) {
+        console.error("Expected a stopped Orca server. Stop it in the independent terminal and retry.");
+        process.exit(1);
+    }
+' <<<"$status"
+
+# Keep recovery files outside the live profile. Both rename pairs use the
+# filesystem of their own destination.
+backup=$(mktemp -d "$work/backup.XXXXXXXX")
+printf 'Profile backup: %s/profile\n' "$backup"
+cp -a -- "$profile" "$backup/profile"
+new_wrapper=
+root_stage=
+committed=0
+bashrc_backup=
+bashrc_tmp=
+bashrc_modified=0
+bashrc_restored=0
+
+restore_bashrc() {
+    [[ $bashrc_modified == 1 && $bashrc_restored == 0 ]] || return 0
+    bashrc_restored=1
+    local tmp
+    tmp=$(mktemp "${bashrc}.restore.XXXXXXXX") || return 1
+    if cp -p -- "$bashrc_backup" "$tmp" && mv -Tf -- "$tmp" "$bashrc"; then
+        printf 'Bashrc restored: %s\n' "$bashrc"
+        return 0
+    fi
+    rm -f -- "$tmp"
+    printf 'Bashrc restore needs manual recovery from %s\n' "$bashrc_backup" >&2
+    return 1
+}
+
+cleanup() {
+    local rc=$?
+    trap '' INT TERM HUP
+    set +e
+    if ! restore_bashrc; then
+        rc=1
+    fi
+    if [[ $committed == 0 && -n $root_stage ]] && sudo test -d "$root_stage/previous"; then
+        if [[ -e $install_dir ]]; then
+            sudo mv -T -- "$install_dir" "$root_stage/rejected"
+        fi
+        if ! sudo mv -T -- "$root_stage/previous" "$install_dir"; then
+            printf 'Install rollback needs manual recovery from %s/previous\n' "$root_stage" >&2
+            rc=1
+        fi
+        if ! cp -p -- "$backup/profile/cli/bin/orca" "$new_wrapper" ||
+            ! mv -Tf -- "$new_wrapper" "$wrapper"; then
+            printf 'CLI wrapper rollback needs manual recovery from %s/profile\n' "$backup" >&2
+            rc=1
+        fi
+    fi
+    if [[ -n $bashrc_tmp ]]; then
+        rm -f -- "$bashrc_tmp"
+    fi
+    rm -f -- "$new_wrapper"
+    rm -rf -- "$stage"
+    exit "$rc"
+}
+trap cleanup EXIT
+new_wrapper=$(mktemp "${wrapper}.new.XXXXXXXX")
+
+if [[ $bashrc_have == 1 ]]; then
+    bashrc_backup=$backup/bashrc
+    cp -p -- "$bashrc" "$bashrc_backup"
+    printf 'Bashrc backup: %s\n' "$bashrc_backup"
+    # Arm restore before the first write so a signal during removal is covered.
+    bashrc_modified=1
+    bashrc_tmp=$(mktemp "${bashrc}.upgrade.XXXXXXXX")
+    chmod --reference="$bashrc" "$bashrc_tmp"
+    awk -v start="$autostart_start" -v end="$autostart_end" '
+        $0 == start { skip = 1 }
+        !skip { print }
+        $0 == end { skip = 0 }
+    ' "$bashrc" > "$bashrc_tmp"
+    mv -Tf -- "$bashrc_tmp" "$bashrc"
+    bashrc_tmp=
+fi
+{
+    printf '#!/usr/bin/env bash\nset -eu\nexport ORCA_USER_DATA_PATH=%q\n' "$profile"
+    printf 'unset NODE_OPTIONS NODE_REPL_EXTERNAL_MODULE ELECTRON_RUN_AS_NODE\n'
+    printf 'exec %q %q "$@"\n' "$node" "$install_dir/orcad/out/cli/index.js"
+} > "$new_wrapper"
+chmod 700 "$new_wrapper"
+sudo -v
+root_stage=$(sudo mktemp -d "${install_dir}.upgrade.XXXXXXXX")
+printf 'Install backup after switch: %s/previous\n' "$root_stage"
+sudo cp -a --no-preserve=ownership -- "$stage/package" "$root_stage/candidate"
+sudo mv -T -- "$install_dir" "$root_stage/previous"
+sudo mv -T -- "$root_stage/candidate" "$install_dir"
+[[ $(probe "$install_dir/bin/orca-ide" --version) == "$version" ]] || die 'Installed launcher version mismatch.'
+[[ $(probe "$node" "$install_dir/orcad/out/cli/index.js" --version) == "$version" ]] \
+    || die 'Installed CLI version mismatch.'
+mv -Tf -- "$new_wrapper" "$wrapper"
+committed=1
+printf 'Installed v%s. Start Orca and verify the existing mobile connection from the independent terminal.\n' "$version"

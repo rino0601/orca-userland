@@ -11,6 +11,7 @@ nav = [
     ]},
     { "실전 가이드" = [
         { "개발 환경 설정하기" = "how-to/run-setup.md" },
+        { "Orca 서버 업그레이드" = "how-to/upgrade-orca-server.md" },
         { "모바일 페어링 링크 다시 얻기" = "how-to/get-mobile-pairing-link.md" },
         { "자동 실행 다시 켜기" = "how-to/enable-autostart.md" },
         { "자동 실행 끄기·되돌리기" = "how-to/disable-autostart.md" },
