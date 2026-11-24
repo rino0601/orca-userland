@@ -35,6 +35,7 @@ if [[ $mode == --plan ]]; then
     printf 'Release: v%s (%s)\nArchive: %s/%s\nChecksums: %s/%s\nInstall: %s\nProfile: %s\n' \
         "$version" "$arch" "$base" "$archive" "$base" "$manifest" "$install_dir" "$profile"
     printf '%s\n' 'Prepare and verify in a private work directory. In an independent terminal, disable autostart and stop this profile. Apply backs up the profile and old install, switches the package and CLI wrapper, and checks both versions. Restart and verify the existing mobile connection separately.'
+    printf '%s\n' 'Apply also backs up ~/.bashrc, removes the Orca autostart block for the switch, and restores it on success, failure, or interruption.'
     exit
 fi
 [[ $EUID != 0 ]] || die 'Run as the profile owner. The script invokes sudo for install files only.'
@@ -117,11 +118,29 @@ cd "$work"
 [[ -d $install_dir && ! -L $install_dir && -x $install_dir/bin/orca-ide &&
     ! -L $profile && -f $wrapper && -x $wrapper && ! -L $wrapper ]] \
     || die 'Expected the tutorial install and a regular executable CLI wrapper.'
-if [[ -e $HOME/.bashrc && ! -r $HOME/.bashrc ]]; then
-    die 'Cannot read .bashrc to verify autostart is disabled.'
+bashrc=$HOME/.bashrc
+autostart_start='# >>> orca-server-autostart (UserLAnd) >>>'
+autostart_end='# <<< orca-server-autostart (UserLAnd) <<<'
+bashrc_have=0
+if [[ -L $bashrc ]]; then
+    die 'Cannot use a symbolic link as .bashrc for the autostart block check.'
 fi
-if [[ -r $HOME/.bashrc ]] && grep -qF '# >>> orca-server-autostart (UserLAnd) >>>' "$HOME/.bashrc"; then
-    die 'Disable the full Orca autostart block before applying.'
+if [[ -e $bashrc ]]; then
+    [[ -f $bashrc && -r $bashrc ]] || die 'Cannot read .bashrc to check the autostart block.'
+    [[ -O $bashrc ]] || die 'Cannot preserve .bashrc ownership. Run as the file owner.'
+    marker_info=$(awk -v start="$autostart_start" -v end="$autostart_end" '
+        $0 == start { starts++; if (!first_start) first_start = NR }
+        $0 == end { ends++; if (!first_end) first_end = NR }
+        END { printf "%d %d %d %d\n", starts, ends, first_start, first_end }
+    ' "$bashrc") || die 'Cannot inspect .bashrc for autostart markers.'
+    read -r start_count end_count start_line end_line <<<"$marker_info"
+    if (( start_count == 0 && end_count == 0 )); then
+        bashrc_have=0
+    elif (( start_count != 1 || end_count != 1 || start_line >= end_line )); then
+        die 'Malformed Orca autostart block in .bashrc: expected exactly one start and one end marker with the start first. Fix the markers before applying.'
+    else
+        bashrc_have=1
+    fi
 fi
 
 check_archive
@@ -153,13 +172,35 @@ probe "$staged_node" -e '
 backup=$(mktemp -d "$work/backup.XXXXXXXX")
 printf 'Profile backup: %s/profile\n' "$backup"
 cp -a -- "$profile" "$backup/profile"
-new_wrapper=$(mktemp "${wrapper}.new.XXXXXXXX")
+new_wrapper=
 root_stage=
 committed=0
+bashrc_backup=
+bashrc_tmp=
+bashrc_modified=0
+bashrc_restored=0
+
+restore_bashrc() {
+    [[ $bashrc_modified == 1 && $bashrc_restored == 0 ]] || return 0
+    bashrc_restored=1
+    local tmp
+    tmp=$(mktemp "${bashrc}.restore.XXXXXXXX") || return 1
+    if cp -p -- "$bashrc_backup" "$tmp" && mv -Tf -- "$tmp" "$bashrc"; then
+        printf 'Bashrc restored: %s\n' "$bashrc"
+        return 0
+    fi
+    rm -f -- "$tmp"
+    printf 'Bashrc restore needs manual recovery from %s\n' "$bashrc_backup" >&2
+    return 1
+}
+
 cleanup() {
     local rc=$?
     trap '' INT TERM HUP
     set +e
+    if ! restore_bashrc; then
+        rc=1
+    fi
     if [[ $committed == 0 && -n $root_stage ]] && sudo test -d "$root_stage/previous"; then
         if [[ -e $install_dir ]]; then
             sudo mv -T -- "$install_dir" "$root_stage/rejected"
@@ -174,11 +215,32 @@ cleanup() {
             rc=1
         fi
     fi
+    if [[ -n $bashrc_tmp ]]; then
+        rm -f -- "$bashrc_tmp"
+    fi
     rm -f -- "$new_wrapper"
     rm -rf -- "$stage"
     exit "$rc"
 }
 trap cleanup EXIT
+new_wrapper=$(mktemp "${wrapper}.new.XXXXXXXX")
+
+if [[ $bashrc_have == 1 ]]; then
+    bashrc_backup=$backup/bashrc
+    cp -p -- "$bashrc" "$bashrc_backup"
+    printf 'Bashrc backup: %s\n' "$bashrc_backup"
+    # Arm restore before the first write so a signal during removal is covered.
+    bashrc_modified=1
+    bashrc_tmp=$(mktemp "${bashrc}.upgrade.XXXXXXXX")
+    chmod --reference="$bashrc" "$bashrc_tmp"
+    awk -v start="$autostart_start" -v end="$autostart_end" '
+        $0 == start { skip = 1 }
+        !skip { print }
+        $0 == end { skip = 0 }
+    ' "$bashrc" > "$bashrc_tmp"
+    mv -Tf -- "$bashrc_tmp" "$bashrc"
+    bashrc_tmp=
+fi
 {
     printf '#!/usr/bin/env bash\nset -eu\nexport ORCA_USER_DATA_PATH=%q\n' "$profile"
     printf 'unset NODE_OPTIONS NODE_REPL_EXTERNAL_MODULE ELECTRON_RUN_AS_NODE\n'
